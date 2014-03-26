@@ -1,10 +1,11 @@
 package redis.contrib
 
-import redis.clients.jedis.{ Pipeline, Jedis, JedisPool, JedisPoolConfig }
+import redis.clients.jedis.{ Pipeline, JedisPool, JedisPoolConfig }
 import redis.clients.jedis.exceptions.JedisConnectionException
 import scala.io.Source
 import java.io.File
 import java.util.Date
+import scala.util.{ Success, Try }
 
 object Main extends App {
 
@@ -25,10 +26,30 @@ object Main extends App {
       delete
     }
 
+    case "set" ⇒ {
+      if (args.length < 3) {
+        println("Please provide a separator string")
+        usage()
+        sys.exit()
+      }
+      println("Running in set mode.")
+      set(args(2))
+    }
+
+    case "setBitBoolean" ⇒ {
+      if (args.length < 3) {
+        println("Please provide a separator string")
+        usage()
+        sys.exit()
+      }
+      println("Running in set mode.")
+      setBitBoolean(args(2))
+    }
+
     case "expire" ⇒ {
       if (args.length < 3) {
         println("Asked to expire but not given a timeout in seconds.")
-        usage
+        usage()
         sys.exit()
       }
 
@@ -38,7 +59,7 @@ object Main extends App {
 
     case _ ⇒ {
       println("No valid command provided.")
-      usage
+      usage()
       sys.exit()
     }
   }
@@ -54,7 +75,7 @@ object Main extends App {
 
   Source.fromFile(commandsFile).getLines().grouped(batchSize).foreach(
     batch ⇒ {
-      val jedis = pool.getResource()
+      val jedis = pool.getResource
       val pipeline = jedis.pipelined()
       b += 1
 
@@ -69,12 +90,31 @@ object Main extends App {
       }
     })
 
-  pool.destroy();
+  pool.destroy()
 
-  def usage {
+  def usage() {
     println(s"Usage: redis-mass /path/to/file/with/redis/keys <command> [options]")
-    println("  del         delete keys from file")
-    println("  expire ttl  expire keys from file")
+    println("  set separator             set keys from file")
+    println("  setBitBoolean separator   set keys from file")
+    println("  del                       delete keys from file")
+    println("  expire ttl                expire keys from file")
+  }
+
+  def set(separator: String)(pipeline: Pipeline, keysAndValues: Seq[String]) = {
+    keysAndValues.foreach(splitToTuple(_, separator) match {
+      case (key: String, value: String) ⇒ pipeline.set(key, value)
+      case _                            ⇒ ()
+    })
+  }
+
+  def setBitBoolean(separator: String)(pipeline: Pipeline, keysAndValues: Seq[String]) = {
+    keysAndValues.foreach(splitToTuple(_, separator) match {
+      case (key: String, offset: String, value: String) ⇒ (Try(offset.toLong), Try(value.toBoolean)) match {
+        case (Success(longOffset), Success(booleanValue)) ⇒ pipeline.setbit(key, longOffset, booleanValue)
+        case _ ⇒ ()
+      }
+      case _ ⇒ ()
+    })
   }
 
   def delete(pipeline: Pipeline, key: Seq[String]) {
@@ -84,5 +124,14 @@ object Main extends App {
 
   def expire(timeout: Int)(pipeline: Pipeline, key: Seq[String]) {
     key.foreach(pipeline.expire(_, timeout))
+  }
+
+  def splitToTuple(string: String, separator: String) = {
+    string.split(separator) match {
+      case Array(str1, str2, str3) ⇒ (str1, str2, str3)
+      case Array(str1, str2)       ⇒ (str1, str2)
+      case Array(str1)             ⇒ (str1, "")
+      case array                   ⇒ (array.head, array.tail.mkString(separator))
+    }
   }
 }
