@@ -4,8 +4,10 @@ import redis.clients.jedis.{ Pipeline, JedisPool, JedisPoolConfig }
 import redis.clients.jedis.exceptions.JedisConnectionException
 import scala.io.Source
 import java.io.File
+import java.net.URI
 import java.util.Date
 import scala.util.{ Success, Try }
+import com.typesafe.config.ConfigFactory
 
 object Main extends App {
 
@@ -15,8 +17,10 @@ object Main extends App {
     sys.exit()
   }
 
-  val redisServer = "localhost"
-  val batchSize = 1000
+  val conf = ConfigFactory.load()
+  val redisServer = conf.getString("redis-mass.redis-server-uri")
+  val redisServerUri = new URI(redisServer)
+  val batchSize = conf.getInt("redis-mass.batch-size")
   val commandsFile = args(0)
   val command = args(1)
 
@@ -64,7 +68,7 @@ object Main extends App {
     }
   }
 
-  val pool = new JedisPool(new JedisPoolConfig(), redisServer)
+  val pool = new JedisPool(redisServerUri)
 
   if (!new File(commandsFile).exists()) {
     println(s"Could not find commands file: $commandsFile")

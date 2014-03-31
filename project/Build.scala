@@ -5,9 +5,9 @@ object ApplicationBuild extends Build {
   override lazy val settings = super.settings ++
     Seq(
       name := "redis-mass",
-      version := "0.0.1",
+      version := "0.0.2",
       organization := "net.mardambey",
-      scalaVersion := "2.10.3",
+      scalaVersion := "2.10.4",
       fork in run := true,
       resolvers ++= Seq(Resolver.mavenLocal,
         "Sonatype OSS Releases" at "http://oss.sonatype.org/content/repositories/releases/",
@@ -18,7 +18,8 @@ object ApplicationBuild extends Build {
     )
 
   val appDependencies = Seq(
-    "redis.clients" % "jedis" % "2.4.1"
+    "redis.clients" % "jedis" % "2.4.1",
+    "com.typesafe" % "config" % "0.4.0"
   )
 
   lazy val root = Project(id = "redis-mass",
